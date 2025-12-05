@@ -14,7 +14,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-CDN_URL="https://cdn.example.com/cortex-vipresponse"  # Replace with actual CDN URL
+CDN_URL="https://github.com/ctx-download/vipres/raw/refs/heads/main/cortex-vipresponse"
 INSTALL_DIR="/var/www/cortex/microservices/networks_apis"
 BINARY_NAME="cortex-vipresponse"
 BINARY_PATH="${INSTALL_DIR}/${BINARY_NAME}"
