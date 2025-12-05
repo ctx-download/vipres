@@ -14,7 +14,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-CDN_URL="https://github.com/ctx-download/vipres/raw/refs/heads/main/cortex-vipresponse"
+BINARY_CDN_URL="https://github.com/ctx-download/vipres/raw/refs/heads/main/cortex-vipresponse"
+SPONSOR_MODEL_URL="https://github.com/ctx-download/vipres/raw/refs/heads/main/Sponsor.php"
 INSTALL_DIR="/var/www/cortex/microservices/networks_apis"
 BINARY_NAME="cortex-vipresponse"
 BINARY_PATH="${INSTALL_DIR}/${BINARY_NAME}"
@@ -61,12 +62,12 @@ download_binary() {
     
     # Download the binary
     if command -v wget &> /dev/null; then
-        wget -O "${BINARY_PATH}" "${CDN_URL}" || {
+        wget -O "${BINARY_PATH}" "${BINARY_CDN_URL}" || {
             print_error "Failed to download binary using wget"
             return 1
         }
     elif command -v curl &> /dev/null; then
-        curl -L -o "${BINARY_PATH}" "${CDN_URL}" || {
+        curl -L -o "${BINARY_PATH}" "${BINARY_CDN_URL}" || {
             print_error "Failed to download binary using curl"
             return 1
         }
@@ -108,62 +109,40 @@ set_permissions() {
 update_sponsor_model() {
     print_info "Updating Sponsor.php model..."
     
-    # Check if VipResponse already exists in sponsors_templates
-    if grep -q '"VipResponse"' "${SPONSOR_MODEL_PATH}"; then
-        print_info "VipResponse already exists in sponsors_templates array. Skipping..."
-        return 0
-    fi
-    
     # Create backup of Sponsor.php
     print_info "Creating backup of Sponsor.php..."
     cp "${SPONSOR_MODEL_PATH}" "${SPONSOR_MODEL_PATH}${BACKUP_SUFFIX}"
     
-    # Find the last element in sponsors_templates array and add VipResponse after it
-    print_info "Adding VipResponse to sponsors_templates array..."
+    # Download the new version from GitHub
+    print_info "Downloading updated Sponsor.php from GitHub..."
     
-    # Create the VipResponse template entry
-    local vipresponse_entry='        [
-            '\''id'\'' => "17",
-            '\''name'\'' => "VipResponse",
-            '\''auto_l_s'\'' => "none",
-            '\''api_url_campaign'\'' => "https://api.viprsp.nl/api",
-            '\''api_url_reporting'\'' => "https://api.viprsp.nl/api",
-            '\''api_driver'\'' => "cortex-vipresponse",
-            '\''login_page_link'\'' => "#none",
-            '\''home_page_link'\'' => "#none",
-            '\''auto_login_driver'\'' => "none",
-            '\''link_template'\'' => "&sub_id1=[user]&sub_id2=[offer]-[campaign]&sub_id3=[list]-[email]-[interface]",
-        ]'
-    
-    # Use awk to insert the new entry before the closing ];
-    awk -v entry="${vipresponse_entry}" '
-    /^    \];[ ]*$/ && !done {
-        # Check if previous line ends with a closing bracket
-        if (prev ~ /^        \]/) {
-            print prev ","
-            print entry
-            print $0
-            done=1
-            next
+    if command -v wget &> /dev/null; then
+        wget -O "${SPONSOR_MODEL_PATH}" "${SPONSOR_MODEL_URL}" || {
+            print_error "Failed to download Sponsor.php using wget"
+            print_info "Restoring from backup..."
+            cp "${SPONSOR_MODEL_PATH}${BACKUP_SUFFIX}" "${SPONSOR_MODEL_PATH}"
+            return 1
         }
-    }
-    {
-        if (prev != "") print prev
-        prev = $0
-    }
-    END {
-        if (prev != "") print prev
-    }
-    ' "${SPONSOR_MODEL_PATH}" > "${SPONSOR_MODEL_PATH}.tmp"
-    
-    # Check if the update was successful
-    if grep -q '"VipResponse"' "${SPONSOR_MODEL_PATH}.tmp"; then
-        mv "${SPONSOR_MODEL_PATH}.tmp" "${SPONSOR_MODEL_PATH}"
-        print_info "Successfully added VipResponse to sponsors_templates array"
+    elif command -v curl &> /dev/null; then
+        curl -L -o "${SPONSOR_MODEL_PATH}" "${SPONSOR_MODEL_URL}" || {
+            print_error "Failed to download Sponsor.php using curl"
+            print_info "Restoring from backup..."
+            cp "${SPONSOR_MODEL_PATH}${BACKUP_SUFFIX}" "${SPONSOR_MODEL_PATH}"
+            return 1
+        }
     else
-        rm -f "${SPONSOR_MODEL_PATH}.tmp"
-        print_error "Failed to add VipResponse to sponsors_templates array"
-        print_warning "Backup available at: ${SPONSOR_MODEL_PATH}${BACKUP_SUFFIX}"
+        print_error "Neither wget nor curl is available. Please install one of them."
+        return 1
+    fi
+    
+    # Verify the downloaded file is valid PHP
+    if grep -q "class Sponsor" "${SPONSOR_MODEL_PATH}"; then
+        print_info "Successfully updated Sponsor.php with VipResponse support"
+        print_info "Backup saved at: ${SPONSOR_MODEL_PATH}${BACKUP_SUFFIX}"
+    else
+        print_error "Downloaded file appears to be invalid"
+        print_info "Restoring from backup..."
+        cp "${SPONSOR_MODEL_PATH}${BACKUP_SUFFIX}" "${SPONSOR_MODEL_PATH}"
         return 1
     fi
 }
